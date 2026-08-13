@@ -6,18 +6,21 @@ Run by the "Refresh Sopron hotel prices" GitHub Actions workflow daily.
 data.json is fetched by the hotel showcase widget on bestofsopron.eu via
 raw.githubusercontent.com - this script is the only thing that writes it.
 
-Base URL and auth scheme are per Tripadvisor's own docs (relayed by the
-repo owner - this sandbox can't reach terra.tripadvisor.com to verify
-directly, so the real test is the scheduled/dispatched workflow run
-itself, not this script in isolation):
-    Base URL: https://terra.tripadvisor.com/api
-    Auth:     header "X-Tripadvisor-API-Key: <key>" (recommended), or
-              query param "?key=<key>" (legacy Content API style) - see
-              TRIPADVISOR_AUTH_MODE below to switch without a code change.
-Hotel search is POST /recommendations/search. Two different doc sources
-disagreed on the exact header name (X-API-KEY vs X-Tripadvisor-API-Key)
-and neither documented pricing as a returned field (Location/Reviews/
-Photos/Geo/Recommendations only were listed) - Tripadvisor's live
+Base URL is per Tripadvisor's own docs (relayed by the repo owner - this
+sandbox can't reach terra.tripadvisor.com to verify directly):
+    https://terra.tripadvisor.com/api
+A first real run against POST /recommendations/search confirmed that host
+and path are reachable (a clean 401, not a connection/DNS error), but
+every doc source has disagreed on the auth scheme, and the first attempt
+(X-Tripadvisor-API-Key header) was rejected. Since this sandbox can't
+dispatch the workflow itself - each guess costs the repo owner a manual
+click - send_request() now tries several plausible schemes in one run
+(see _auth_candidates()) and reports in the log which one, if any, got
+past authentication. Once one works, pin it via TRIPADVISOR_AUTH_MODE so
+future runs don't need to retry them all.
+
+Neither doc source documented pricing as a returned field (Location/
+Reviews/Photos/Geo/Recommendations only were listed) - Tripadvisor's live
 per-night pricing is typically a separate sponsored-placement feed, not
 part of the general Partner API. Until that's confirmed one way or the
 other, parse_hotel() below keeps each hotel's previous price rather than
@@ -29,11 +32,13 @@ Required environment variable:
 
 Optional environment variables:
     TRIPADVISOR_TERRA_BASE_URL  Overrides the default base URL above.
-    TRIPADVISOR_AUTH_MODE       "header" (default, X-Tripadvisor-API-Key)
-                                 or "query" (?key=... appended to the URL).
-    SOPRON_LOCATION              Defaults to "Sopron, Hungary".
-    SOPRON_CHECK_IN               YYYY-MM-DD, defaults to 14 days from today.
-    SOPRON_NIGHTS                 Defaults to 1.
+    TRIPADVISOR_AUTH_MODE        Pin to one scheme instead of trying all of
+                                  them: "header:X-Tripadvisor-API-Key",
+                                  "header:X-API-Key", "query:key", or
+                                  "header:Authorization-Bearer".
+    SOPRON_LOCATION               Defaults to "Sopron, Hungary".
+    SOPRON_CHECK_IN                YYYY-MM-DD, defaults to 14 days from today.
+    SOPRON_NIGHTS                  Defaults to 1.
 
 TODO once the /recommendations/search request/response schema is fully
 confirmed: verify the request payload below and the field names
@@ -116,34 +121,60 @@ def parse_hotel(rank: int, hotel: dict, previous_by_id: dict) -> dict:
     }
 
 
+def _auth_candidates(api_key: str):
+    """(name, extra_headers, extra_params) for each auth scheme worth
+    trying. Every doc source so far has disagreed on the exact scheme, and
+    each manual test costs the repo owner a round trip (this sandbox can't
+    dispatch the workflow itself), so a failed run tries all of them in one
+    go and reports which - if any - actually got past authentication."""
+    return [
+        ("header:X-Tripadvisor-API-Key", {"X-Tripadvisor-API-Key": api_key}, None),
+        ("header:X-API-Key", {"X-API-Key": api_key}, None),
+        ("query:key", {}, {"key": api_key}),
+        ("header:Authorization-Bearer", {"Authorization": f"Bearer {api_key}"}, None),
+    ]
+
+
 def send_request(base_url: str, api_key: str) -> dict:
     url = f"{base_url.rstrip('/')}/recommendations/search"
-    headers = {"Content-Type": "application/json"}
+    payload = {
+        "location": LOCATION,
+        "checkIn": CHECK_IN,
+        "checkOut": CHECK_OUT,
+        "guests": ADULTS,
+        "rooms": ROOMS,
+        "sortBy": "POPULARITY",
+        "limit": 20,
+    }
 
-    auth_mode = os.environ.get("TRIPADVISOR_AUTH_MODE", "header").lower()
-    params = None
-    if auth_mode == "query":
-        params = {"key": api_key}
-    else:
-        headers["X-Tripadvisor-API-Key"] = api_key
+    requested_mode = os.environ.get("TRIPADVISOR_AUTH_MODE", "").strip()
+    candidates = _auth_candidates(api_key)
+    if requested_mode:
+        candidates = [c for c in candidates if c[0] == requested_mode]
+        if not candidates:
+            sys.exit(
+                f"TRIPADVISOR_AUTH_MODE={requested_mode!r} doesn't match any "
+                f"known scheme: {[c[0] for c in _auth_candidates(api_key)]}"
+            )
 
-    response = requests.post(
-        url,
-        headers=headers,
-        params=params,
-        json={
-            "location": LOCATION,
-            "checkIn": CHECK_IN,
-            "checkOut": CHECK_OUT,
-            "guests": ADULTS,
-            "rooms": ROOMS,
-            "sortBy": "POPULARITY",
-            "limit": 20,
-        },
-        timeout=30,
+    attempts = []
+    for name, extra_headers, params in candidates:
+        headers = {"Content-Type": "application/json", **extra_headers}
+        response = requests.post(url, headers=headers, params=params, json=payload, timeout=30)
+        if response.status_code in (401, 403):
+            attempts.append(f"{name}: {response.status_code} {response.text[:200]!r}")
+            continue
+        print(f"Auth scheme '{name}' got past authentication (status {response.status_code}).")
+        response.raise_for_status()
+        return response.json()
+
+    sys.exit(
+        "All auth schemes were rejected (401/403) by "
+        + url
+        + ":\n"
+        + "\n".join(attempts)
+        + "\nThe key itself may be inactive/wrong for this endpoint - check the Terra dashboard."
     )
-    response.raise_for_status()
-    return response.json()
 
 
 def fetch_hotels(previous_by_id: dict) -> list:

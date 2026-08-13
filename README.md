@@ -26,11 +26,21 @@ variables → Actions → New repository secret) - never commit them to a file:
 |---|---|---|
 | `TRIPADVISOR_API_KEY` | yes | Your Tripadvisor Terra/Partner API key |
 | `TRIPADVISOR_TERRA_BASE_URL` | no | Defaults to `https://terra.tripadvisor.com/api`. Only set this if your account uses a different host. |
-| `TRIPADVISOR_AUTH_MODE` | no | `header` (default - sends `X-Tripadvisor-API-Key: <key>`) or `query` (appends `?key=<key>` instead) |
+| `TRIPADVISOR_AUTH_MODE` | no | Pin to one auth scheme instead of trying all of them each run - see `refresh.py`'s `_auth_candidates()` for the exact values |
 
 Until `TRIPADVISOR_API_KEY` is set, the scheduled workflow will fail
 without changing `data.json`, so the live widget just keeps showing the
 last good snapshot.
+
+**Status as of the first real run:** `https://terra.tripadvisor.com/api`
+is reachable and `POST /recommendations/search` exists (confirmed by a
+clean `401`, not a connection error), but the `X-Tripadvisor-API-Key`
+header scheme was rejected. `refresh.py` now tries several plausible auth
+schemes per run and logs which one (if any) gets past authentication -
+check the latest run's log for a line like `Auth scheme '...' got past
+authentication`. If all of them 401, the key itself likely needs
+checking on the Terra dashboard (inactive, wrong product/plan, etc.)
+rather than the scheme being wrong.
 
 **Known gap:** Tripadvisor's published Partner API endpoint overview
 (`/recommendations/search`, `/locations/{id}`, `/locations/{id}/reviews`,
