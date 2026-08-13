@@ -127,9 +127,12 @@ def _auth_candidates(api_key: str):
     each manual test costs the repo owner a round trip (this sandbox can't
     dispatch the workflow itself), so a failed run tries all of them in one
     go and reports which - if any - actually got past authentication."""
+    # header:X-API-Key confirmed working (run #2: got past auth, hit a
+    # payload-level 400 instead) - tried first so runs stop guessing auth
+    # as soon as one candidate succeeds.
     return [
-        ("header:X-Tripadvisor-API-Key", {"X-Tripadvisor-API-Key": api_key}, None),
         ("header:X-API-Key", {"X-API-Key": api_key}, None),
+        ("header:X-Tripadvisor-API-Key", {"X-Tripadvisor-API-Key": api_key}, None),
         ("query:key", {}, {"key": api_key}),
         ("header:Authorization-Bearer", {"Authorization": f"Bearer {api_key}"}, None),
     ]
@@ -165,8 +168,12 @@ def send_request(base_url: str, api_key: str) -> dict:
             attempts.append(f"{name}: {response.status_code} {response.text[:200]!r}")
             continue
         print(f"Auth scheme '{name}' got past authentication (status {response.status_code}).")
+        if not response.ok:
+            print(f"Response body: {response.text[:2000]}")
         response.raise_for_status()
-        return response.json()
+        body = response.json()
+        print(f"Response JSON keys: {list(body.keys())}")
+        return body
 
     sys.exit(
         "All auth schemes were rejected (401/403) by "
