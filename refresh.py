@@ -139,15 +139,23 @@ def _auth_candidates(api_key: str):
 
 
 def send_request(base_url: str, api_key: str) -> dict:
+    # Confirmed request shape (repo owner pulled two examples from
+    # Tripadvisor's readme.io reference page): {"query": <natural
+    # language>, "geo": {"name": <place>} (or {"search_area": {lat, lng,
+    # search_radius_meters}}), "limit": <n>, "response_preference":
+    # "quality"}. There's also a "top_level_categories" filter (e.g.
+    # ["Attraction"]) - left out here since the exact enum value for
+    # hotels is unconfirmed and a wrong one risks another 400; the query
+    # text does that filtering instead for now. No date/guests/rooms/sort
+    # fields exist in this schema at all - it's a semantic recommendations
+    # endpoint, not a structured price-search API, which lines up with
+    # pricing never being listed among the Partner API's data types.
     url = f"{base_url.rstrip('/')}/recommendations/search"
     payload = {
-        "location": LOCATION,
-        "checkIn": CHECK_IN,
-        "checkOut": CHECK_OUT,
-        "guests": ADULTS,
-        "rooms": ROOMS,
-        "sortBy": "POPULARITY",
+        "query": f"best hotels in {LOCATION}",
+        "geo": {"name": LOCATION},
         "limit": 20,
+        "response_preference": "quality",
     }
 
     requested_mode = os.environ.get("TRIPADVISOR_AUTH_MODE", "").strip()
@@ -173,6 +181,9 @@ def send_request(base_url: str, api_key: str) -> dict:
         response.raise_for_status()
         body = response.json()
         print(f"Response JSON keys: {list(body.keys())}")
+        # Full dump so response parsing can be nailed down from this run's
+        # log alone, without yet another manual dispatch round trip.
+        print(f"Full response body:\n{json.dumps(body, indent=2)[:4000]}")
         return body
 
     sys.exit(
