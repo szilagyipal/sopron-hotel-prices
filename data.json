@@ -1,0 +1,174 @@
+{
+  "generatedAt": "2026-08-13T00:00:00Z",
+  "location": {
+    "name": "Sopron, Hungary",
+    "geoId": 274909
+  },
+  "sampleStay": {
+    "checkIn": "2026-08-23",
+    "checkOut": "2026-08-24",
+    "nights": 1,
+    "adults": 2,
+    "rooms": 1
+  },
+  "currency": "USD",
+  "priceDisclaimer": "Prices are provided by Tripadvisor's booking partners and reflect the total cost for the sample stay shown, including mandatory fees. Taxes not included. Final price and availability are confirmed on Tripadvisor.",
+  "hotels": [
+    {
+      "rank": 1,
+      "hotelId": 279453,
+      "name": "Pannonia Hotel",
+      "rating": 4.3,
+      "reviewCount": 1031,
+      "priceFrom": 87,
+      "taxesAndFees": 9,
+      "styles": ["Classic", "Romantic", "Charming"],
+      "thumbnail": "https://media-cdn.tripadvisor.com/media/photo-w/2e/7c/a0/61/spa-relaxation-area.jpg",
+      "tripadvisorUrl": "https://www.tripadvisor.com/Hotel_Review-g274909-d279453-Reviews-Pannonia_Hotel-Sopron_Gyor_Moson_Sopron_County_Central_Transdanubia.html"
+    },
+    {
+      "rank": 2,
+      "hotelId": 1167403,
+      "name": "Hotel Palatinus",
+      "rating": 4.3,
+      "reviewCount": 154,
+      "priceFrom": 86,
+      "taxesAndFees": 9,
+      "styles": ["Charming", "Family", "Quiet"],
+      "thumbnail": "https://media-cdn.tripadvisor.com/media/photo-w/1d/87/6f/fd/hotel-palatinus.jpg",
+      "tripadvisorUrl": "https://www.tripadvisor.com/Hotel_Review-g274909-d1167403-Reviews-Hotel_Palatinus-Sopron_Gyor_Moson_Sopron_County_Central_Transdanubia.html"
+    },
+    {
+      "rank": 3,
+      "hotelId": 2406533,
+      "name": "Rosengarten Hotel",
+      "rating": 4.3,
+      "reviewCount": 82,
+      "priceFrom": 108,
+      "taxesAndFees": 10,
+      "styles": ["City View", "Romantic", "Charming"],
+      "thumbnail": "https://media-cdn.tripadvisor.com/media/photo-w/0d/2e/ee/10/rosengarten-hotel-restaurant.jpg",
+      "tripadvisorUrl": "https://www.tripadvisor.com/Hotel_Review-g274909-d2406533-Reviews-Rosengarten_Hotel-Sopron_Gyor_Moson_Sopron_County_Central_Transdanubia.html"
+    },
+    {
+      "rank": 4,
+      "hotelId": 279454,
+      "name": "Hotel Sopron",
+      "rating": 3.8,
+      "reviewCount": 249,
+      "priceFrom": 138,
+      "taxesAndFees": 12,
+      "styles": ["City View", "Classic", "Modern"],
+      "thumbnail": "https://media-cdn.tripadvisor.com/media/photo-s/1d/b1/2e/f6/hotel-sopron.jpg",
+      "tripadvisorUrl": "https://www.tripadvisor.com/Hotel_Review-g274909-d279454-Reviews-Hotel_Sopron-Sopron_Gyor_Moson_Sopron_County_Central_Transdanubia.html"
+    },
+    {
+      "rank": 5,
+      "hotelId": 1432320,
+      "name": "Hotel Civitas",
+      "rating": 3.8,
+      "reviewCount": 90,
+      "priceFrom": 77,
+      "taxesAndFees": 9,
+      "styles": ["Charming", "Modern", "Family"],
+      "thumbnail": "https://media-cdn.tripadvisor.com/media/photo-w/30/43/4f/84/caption.jpg",
+      "tripadvisorUrl": "https://www.tripadvisor.com/Hotel_Review-g274909-d1432320-Reviews-Hotel_Civitas-Sopron_Gyor_Moson_Sopron_County_Central_Transdanubia.html"
+    },
+    {
+      "rank": 6,
+      "hotelId": 296822,
+      "name": "Hotel Lover",
+      "rating": 3.9,
+      "reviewCount": 192,
+      "priceFrom": 139,
+      "taxesAndFees": 12,
+      "styles": ["Classic", "Great View", "Family"],
+      "thumbnail": "https://media-cdn.tripadvisor.com/media/photo-s/02/2b/56/30/hotel-exterior.jpg",
+      "tripadvisorUrl": "https://www.tripadvisor.com/Hotel_Review-g274909-d296822-Reviews-Hotel_Lover-Sopron_Gyor_Moson_Sopron_County_Central_Transdanubia.html"
+    },
+    {
+      "rank": 7,
+      "hotelId": 616873,
+      "name": "Hotel Fagus",
+      "rating": 3.5,
+      "reviewCount": 112,
+      "priceFrom": 178,
+      "taxesAndFees": 15,
+      "styles": ["Romantic", "Modern", "Great View"],
+      "thumbnail": "https://media-cdn.tripadvisor.com/media/photo-w/28/10/ef/0f/outside-photo.jpg",
+      "tripadvisorUrl": "https://www.tripadvisor.com/Hotel_Review-g274909-d616873-Reviews-Hotel_Fagus-Sopron_Gyor_Moson_Sopron_County_Central_Transdanubia.html"
+    },
+    {
+      "rank": 8,
+      "hotelId": 301622,
+      "name": "Hotel Szieszta",
+      "rating": 3.5,
+      "reviewCount": 4,
+      "priceFrom": 136,
+      "taxesAndFees": 12,
+      "styles": ["Family", "Budget", "Business"],
+      "thumbnail": "https://media-cdn.tripadvisor.com/media/photo-w/31/00/70/8e/caption.jpg",
+      "tripadvisorUrl": "https://www.tripadvisor.com/Hotel_Review-g274909-d301622-Reviews-Hotel_Szieszta-Sopron_Gyor_Moson_Sopron_County_Central_Transdanubia.html"
+    },
+    {
+      "rank": 9,
+      "hotelId": 2138036,
+      "name": "Erhardt Pension",
+      "rating": 4.6,
+      "reviewCount": 81,
+      "priceFrom": 91,
+      "taxesAndFees": 9,
+      "styles": ["Quaint", "Centrally Located", "Romantic"],
+      "thumbnail": "https://media-cdn.tripadvisor.com/media/photo-w/06/aa/0b/6d/erhardt-pension.jpg",
+      "tripadvisorUrl": "https://www.tripadvisor.com/Hotel_Review-g274909-d2138036-Reviews-Erhardt_Pension-Sopron_Gyor_Moson_Sopron_County_Central_Transdanubia.html"
+    },
+    {
+      "rank": 10,
+      "hotelId": 2260938,
+      "name": "Sopron Monastery Hotel",
+      "rating": 4.5,
+      "reviewCount": 56,
+      "priceFrom": 163,
+      "taxesAndFees": 13,
+      "styles": ["Quaint", "Quiet", "Modern"],
+      "thumbnail": "https://media-cdn.tripadvisor.com/media/photo-s/1b/d2/39/cc/udvar.jpg",
+      "tripadvisorUrl": "https://www.tripadvisor.com/Hotel_Review-g274909-d2260938-Reviews-Sopron_Monastery_Hotel-Sopron_Gyor_Moson_Sopron_County_Central_Transdanubia.html"
+    },
+    {
+      "rank": 11,
+      "hotelId": 6597233,
+      "name": "Atrium Panzio",
+      "rating": 4.5,
+      "reviewCount": 20,
+      "priceFrom": 126,
+      "taxesAndFees": 10,
+      "styles": ["Quaint", "Mid-range", "Family"],
+      "thumbnail": "https://media-cdn.tripadvisor.com/media/photo-p/1b/a6/88/38/photo5jpg.jpg",
+      "tripadvisorUrl": "https://www.tripadvisor.com/Hotel_Review-g274909-d6597233-Reviews-Atrium_Panzio-Sopron_Gyor_Moson_Sopron_County_Central_Transdanubia.html"
+    },
+    {
+      "rank": 12,
+      "hotelId": 3345462,
+      "name": "Hét Pecsét Fogadó Étterem",
+      "rating": 4.0,
+      "reviewCount": 24,
+      "priceFrom": 77,
+      "taxesAndFees": 9,
+      "styles": ["Budget", "Family"],
+      "thumbnail": "https://media-cdn.tripadvisor.com/media/photo-w/10/7e/a0/52/het-pecset-fogado-etterem.jpg",
+      "tripadvisorUrl": "https://www.tripadvisor.com/Hotel_Review-g274909-d3345462-Reviews-Het_Pecset_Fogado_Etterem-Sopron_Gyor_Moson_Sopron_County_Central_Transdanubia.html"
+    },
+    {
+      "rank": 13,
+      "hotelId": 10319272,
+      "name": "Erhardt Wirtschaftsburger Haus",
+      "rating": 4.9,
+      "reviewCount": 7,
+      "priceFrom": 116,
+      "taxesAndFees": 10,
+      "styles": ["Mid-range", "Family"],
+      "thumbnail": "https://media-cdn.tripadvisor.com/media/photo-w/0b/c6/ba/1d/erhardt-wirtschaftsburger.jpg",
+      "tripadvisorUrl": "https://www.tripadvisor.com/Hotel_Review-g274909-d10319272-Reviews-Erhardt_Wirtschaftsburger_Haus-Sopron_Gyor_Moson_Sopron_County_Central_Transdanubia.html"
+    }
+  ]
+}

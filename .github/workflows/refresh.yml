@@ -1,0 +1,39 @@
+name: Refresh Sopron hotel prices
+
+on:
+  schedule:
+    # 02:00 UTC = 03:00 CET (winter). During CEST (summer, UTC+2) this
+    # fires at 04:00 local time instead - GitHub Actions cron is fixed
+    # UTC and can't follow CET/CEST daylight saving automatically.
+    - cron: "0 2 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - name: Refresh data.json from Terra
+        run: python refresh.py
+        env:
+          TRIPADVISOR_API_KEY: ${{ secrets.TRIPADVISOR_API_KEY }}
+          TRIPADVISOR_TERRA_BASE_URL: ${{ secrets.TRIPADVISOR_TERRA_BASE_URL }}
+          TRIPADVISOR_AUTH_STYLE: ${{ secrets.TRIPADVISOR_AUTH_STYLE }}
+
+      - name: Commit if data.json changed
+        run: |
+          git config user.name "sopron-hotel-prices-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data.json
+          git diff --cached --quiet || git commit -m "Refresh hotel prices $(date -u +%Y-%m-%d)"
+          git push
