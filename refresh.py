@@ -172,9 +172,21 @@ def send_request(base_url: str, api_key: str) -> dict:
     for name, extra_headers, params in candidates:
         headers = {"Content-Type": "application/json", **extra_headers}
         response = requests.post(url, headers=headers, params=params, json=payload, timeout=30)
-        if response.status_code in (401, 403):
-            attempts.append(f"{name}: {response.status_code} {response.text[:200]!r}")
+        if response.status_code == 401:
+            # Truly unauthenticated - this scheme isn't even being read as
+            # a credential, so it's worth trying the next one.
+            attempts.append(f"{name}: 401 {response.text[:200]!r}")
             continue
+        if response.status_code == 403:
+            # The key WAS read (contrast with the 401s from other schemes
+            # on the same request) but access was denied - almost
+            # certainly an allowlist/entitlement issue, not a wrong auth
+            # scheme, so trying the remaining schemes would just waste
+            # requests. Probe /allowlist (from the endpoint overview) with
+            # this same working header for a direct diagnosis.
+            print(f"Auth scheme '{name}' was read as a credential but got 403: {response.text[:500]}")
+            _probe_allowlist(base_url, name, extra_headers)
+            sys.exit("Access denied (403) - see the allowlist probe above for what's currently permitted.")
         print(f"Auth scheme '{name}' got past authentication (status {response.status_code}).")
         if not response.ok:
             print(f"Response body: {response.text[:2000]}")
@@ -187,12 +199,28 @@ def send_request(base_url: str, api_key: str) -> dict:
         return body
 
     sys.exit(
-        "All auth schemes were rejected (401/403) by "
+        "All auth schemes were rejected (401) by "
         + url
         + ":\n"
         + "\n".join(attempts)
         + "\nThe key itself may be inactive/wrong for this endpoint - check the Terra dashboard."
     )
+
+
+def _probe_allowlist(base_url: str, scheme_name: str, extra_headers: dict) -> None:
+    """Best-effort GET /allowlist diagnostic for a 403 on the main
+    request - per the endpoint overview, this lists which location IDs
+    the key is permitted to query. Never raises; this is purely
+    informational output for the run log."""
+    try:
+        resp = requests.get(
+            f"{base_url.rstrip('/')}/allowlist",
+            headers={"Content-Type": "application/json", **extra_headers},
+            timeout=15,
+        )
+        print(f"GET /allowlist (using {scheme_name}): {resp.status_code} {resp.text[:1000]}")
+    except requests.RequestException as exc:
+        print(f"GET /allowlist probe failed: {exc}")
 
 
 def fetch_hotels(previous_by_id: dict) -> list:
