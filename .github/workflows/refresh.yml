@@ -28,6 +28,7 @@ jobs:
         env:
           TRIPADVISOR_API_KEY: ${{ secrets.TRIPADVISOR_API_KEY }}
           TRIPADVISOR_TERRA_BASE_URL: ${{ secrets.TRIPADVISOR_TERRA_BASE_URL }}
+          TRIPADVISOR_AUTH_MODE: ${{ secrets.TRIPADVISOR_AUTH_MODE }}
 
       - name: Commit if data.json changed
         run: |

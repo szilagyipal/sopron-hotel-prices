@@ -24,12 +24,13 @@ variables → Actions → New repository secret) - never commit them to a file:
 
 | Secret | Required | Notes |
 |---|---|---|
-| `TRIPADVISOR_API_KEY` | yes | Your Tripadvisor Terra/Partner API key. Sent as an `X-API-KEY` header, per Tripadvisor's Partner API overview. |
-| `TRIPADVISOR_TERRA_BASE_URL` | yes | Terra API base host for your account - not listed in the endpoint overview, so check your account dashboard for it |
+| `TRIPADVISOR_API_KEY` | yes | Your Tripadvisor Terra/Partner API key |
+| `TRIPADVISOR_TERRA_BASE_URL` | no | Defaults to `https://terra.tripadvisor.com/api`. Only set this if your account uses a different host. |
+| `TRIPADVISOR_AUTH_MODE` | no | `header` (default - sends `X-Tripadvisor-API-Key: <key>`) or `query` (appends `?key=<key>` instead) |
 
-Until both secrets are set, the scheduled workflow will fail without
-changing `data.json`, so the live widget just keeps showing the last good
-snapshot.
+Until `TRIPADVISOR_API_KEY` is set, the scheduled workflow will fail
+without changing `data.json`, so the live widget just keeps showing the
+last good snapshot.
 
 **Known gap:** Tripadvisor's published Partner API endpoint overview
 (`/recommendations/search`, `/locations/{id}`, `/locations/{id}/reviews`,

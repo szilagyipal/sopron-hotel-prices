@@ -6,32 +6,38 @@ Run by the "Refresh Sopron hotel prices" GitHub Actions workflow daily.
 data.json is fetched by the hotel showcase widget on bestofsopron.eu via
 raw.githubusercontent.com - this script is the only thing that writes it.
 
-Per Tripadvisor's Partner API overview, every endpoint requires an
-"X-API-KEY" header, and hotel search is POST /recommendations/search.
-That overview does NOT list pricing as one of the API's data types
-(Location/Reviews/Photos/Geo/Recommendations only) - Tripadvisor's live
+Base URL and auth scheme are per Tripadvisor's own docs (relayed by the
+repo owner - this sandbox can't reach terra.tripadvisor.com to verify
+directly, so the real test is the scheduled/dispatched workflow run
+itself, not this script in isolation):
+    Base URL: https://terra.tripadvisor.com/api
+    Auth:     header "X-Tripadvisor-API-Key: <key>" (recommended), or
+              query param "?key=<key>" (legacy Content API style) - see
+              TRIPADVISOR_AUTH_MODE below to switch without a code change.
+Hotel search is POST /recommendations/search. Two different doc sources
+disagreed on the exact header name (X-API-KEY vs X-Tripadvisor-API-Key)
+and neither documented pricing as a returned field (Location/Reviews/
+Photos/Geo/Recommendations only were listed) - Tripadvisor's live
 per-night pricing is typically a separate sponsored-placement feed, not
 part of the general Partner API. Until that's confirmed one way or the
 other, parse_hotel() below keeps each hotel's previous price rather than
 zeroing it out if the response has no price field, and rank/rating/review
 data updates normally.
 
-Required environment variables:
-    TRIPADVISOR_API_KEY         Your Terra/Partner API key.
-    TRIPADVISOR_TERRA_BASE_URL  The Terra API base host for your account,
-                                 e.g. "https://api.某.tripadvisor.com" -
-                                 not in the endpoint overview, so this
-                                 script does not guess it.
+Required environment variable:
+    TRIPADVISOR_API_KEY  Your Terra/Partner API key.
 
 Optional environment variables:
-    SOPRON_LOCATION   Defaults to "Sopron, Hungary".
-    SOPRON_CHECK_IN   YYYY-MM-DD, defaults to 14 days from today.
-    SOPRON_NIGHTS     Defaults to 1.
+    TRIPADVISOR_TERRA_BASE_URL  Overrides the default base URL above.
+    TRIPADVISOR_AUTH_MODE       "header" (default, X-Tripadvisor-API-Key)
+                                 or "query" (?key=... appended to the URL).
+    SOPRON_LOCATION              Defaults to "Sopron, Hungary".
+    SOPRON_CHECK_IN               YYYY-MM-DD, defaults to 14 days from today.
+    SOPRON_NIGHTS                 Defaults to 1.
 
-TODO once the /recommendations/search request/response schema is
-confirmed (the endpoint overview only lists the path, not its body):
-verify the request payload below and the field names parse_hotel() reads
-match a real response.
+TODO once the /recommendations/search request/response schema is fully
+confirmed: verify the request payload below and the field names
+parse_hotel() reads match a real response (check the workflow run logs).
 
 On any failure this script exits non-zero WITHOUT touching data.json, so a
 broken run never wipes out the last known-good feed the live site depends on.
@@ -45,6 +51,7 @@ from pathlib import Path
 import requests
 
 DATA_PATH = Path(__file__).parent / "data.json"
+DEFAULT_BASE_URL = "https://terra.tripadvisor.com/api"
 
 LOCATION = os.environ.get("SOPRON_LOCATION", "Sopron, Hungary")
 CHECK_IN = os.environ.get(
@@ -110,14 +117,20 @@ def parse_hotel(rank: int, hotel: dict, previous_by_id: dict) -> dict:
 
 
 def send_request(base_url: str, api_key: str) -> dict:
-    headers = {
-        "X-API-KEY": api_key,
-        "Content-Type": "application/json",
-    }
+    url = f"{base_url.rstrip('/')}/recommendations/search"
+    headers = {"Content-Type": "application/json"}
+
+    auth_mode = os.environ.get("TRIPADVISOR_AUTH_MODE", "header").lower()
+    params = None
+    if auth_mode == "query":
+        params = {"key": api_key}
+    else:
+        headers["X-Tripadvisor-API-Key"] = api_key
 
     response = requests.post(
-        f"{base_url.rstrip('/')}/recommendations/search",
+        url,
         headers=headers,
+        params=params,
         json={
             "location": LOCATION,
             "checkIn": CHECK_IN,
@@ -135,13 +148,9 @@ def send_request(base_url: str, api_key: str) -> dict:
 
 def fetch_hotels(previous_by_id: dict) -> list:
     api_key = os.environ.get("TRIPADVISOR_API_KEY")
-    base_url = os.environ.get("TRIPADVISOR_TERRA_BASE_URL")
-    if not api_key or not base_url:
-        sys.exit(
-            "Set TRIPADVISOR_API_KEY and TRIPADVISOR_TERRA_BASE_URL "
-            "(see docs.terra.tripadvisor.com/docs/overview for your "
-            "account's base URL) before running this script."
-        )
+    if not api_key:
+        sys.exit("Set TRIPADVISOR_API_KEY before running this script.")
+    base_url = os.environ.get("TRIPADVISOR_TERRA_BASE_URL") or DEFAULT_BASE_URL
 
     body = send_request(base_url, api_key)
     results = body.get("hotels") or body.get("data") or body.get("results") or []
