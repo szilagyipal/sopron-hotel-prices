@@ -6,43 +6,44 @@ Run by the "Refresh Sopron hotel prices" GitHub Actions workflow daily.
 data.json is fetched by the hotel showcase widget on bestofsopron.eu via
 raw.githubusercontent.com - this script is the only thing that writes it.
 
-Base URL is per Tripadvisor's own docs (relayed by the repo owner - this
-sandbox can't reach terra.tripadvisor.com to verify directly):
-    https://terra.tripadvisor.com/api
-A first real run against POST /recommendations/search confirmed that host
-and path are reachable (a clean 401, not a connection/DNS error), but
-every doc source has disagreed on the auth scheme, and the first attempt
-(X-Tripadvisor-API-Key header) was rejected. Since this sandbox can't
-dispatch the workflow itself - each guess costs the repo owner a manual
-click - send_request() now tries several plausible schemes in one run
-(see _auth_candidates()) and reports in the log which one, if any, got
-past authentication. Once one works, pin it via TRIPADVISOR_AUTH_MODE so
-future runs don't need to retry them all.
+Base URL: https://terra.tripadvisor.com/api (confirmed reachable).
+Auth: "X-API-Key: <key>" header - confirmed (run #4: other schemes got a
+clean 401 "API key is not provided" on the same request, X-API-Key alone
+got a 403, proving it's the one actually being read as a credential).
+Request shape for POST /recommendations/search - confirmed from
+Tripadvisor's readme.io reference: {"query": <natural language>, "geo":
+{"name": <place>}, "limit": <n>, "response_preference": "quality"}. This
+is a semantic recommendations endpoint, not a structured price-search
+API - there's no date/guest/room/sort field in the schema at all, which
+lines up with pricing never appearing among the Partner API's documented
+data types (Location/Reviews/Photos/Geo/Recommendations only). Until
+that's confirmed one way or the other, parse_hotel() below keeps each
+hotel's previous price rather than zeroing it out if a response has none.
 
-Neither doc source documented pricing as a returned field (Location/
-Reviews/Photos/Geo/Recommendations only were listed) - Tripadvisor's live
-per-night pricing is typically a separate sponsored-placement feed, not
-part of the general Partner API. Until that's confirmed one way or the
-other, parse_hotel() below keeps each hotel's previous price rather than
-zeroing it out if the response has no price field, and rank/rating/review
-data updates normally.
+That 403 turned out to be an allowlist gap, not an auth or payload
+problem: GET /allowlist came back 200 with zero entries, and the 403 body
+said "API Key does not have access to endpoint". Per Tripadvisor's
+POST /allowlist reference (also confirmed by the repo owner), the fix is
+appending this account's queryable location IDs - so send_request() now
+auto-heals a 403 by POSTing {"allowlist": [SOPRON_GEO_ID],
+"operation_type": "APPEND"} (additive only, never removes/replaces
+existing entries) and retrying the search once.
 
 Required environment variable:
     TRIPADVISOR_API_KEY  Your Terra/Partner API key.
 
 Optional environment variables:
     TRIPADVISOR_TERRA_BASE_URL  Overrides the default base URL above.
-    TRIPADVISOR_AUTH_MODE        Pin to one scheme instead of trying all of
-                                  them: "header:X-Tripadvisor-API-Key",
-                                  "header:X-API-Key", "query:key", or
-                                  "header:Authorization-Bearer".
+    TRIPADVISOR_AUTH_MODE        "header" (default) or "query" (sends the
+                                  key as ?key=... instead, in case the
+                                  header scheme ever stops working).
     SOPRON_LOCATION               Defaults to "Sopron, Hungary".
     SOPRON_CHECK_IN                YYYY-MM-DD, defaults to 14 days from today.
     SOPRON_NIGHTS                  Defaults to 1.
 
-TODO once the /recommendations/search request/response schema is fully
-confirmed: verify the request payload below and the field names
-parse_hotel() reads match a real response (check the workflow run logs).
+TODO once a run returns real hotel data: check the logged full response
+body against parse_hotel()'s field names and adjust if they don't match -
+the exact response shape for this endpoint is still unconfirmed.
 
 On any failure this script exits non-zero WITHOUT touching data.json, so a
 broken run never wipes out the last known-good feed the live site depends on.
@@ -57,6 +58,9 @@ import requests
 
 DATA_PATH = Path(__file__).parent / "data.json"
 DEFAULT_BASE_URL = "https://terra.tripadvisor.com/api"
+# Tripadvisor's own geo ID for Sopron, Hungary - confirmed live via the
+# Terra hotel-search tool ("searchGeoData":{"geoId":274909,"name":"Sopron"}).
+SOPRON_GEO_ID = 274909
 
 LOCATION = os.environ.get("SOPRON_LOCATION", "Sopron, Hungary")
 CHECK_IN = os.environ.get(
@@ -121,35 +125,34 @@ def parse_hotel(rank: int, hotel: dict, previous_by_id: dict) -> dict:
     }
 
 
-def _auth_candidates(api_key: str):
-    """(name, extra_headers, extra_params) for each auth scheme worth
-    trying. Every doc source so far has disagreed on the exact scheme, and
-    each manual test costs the repo owner a round trip (this sandbox can't
-    dispatch the workflow itself), so a failed run tries all of them in one
-    go and reports which - if any - actually got past authentication."""
-    # header:X-API-Key confirmed working (run #2: got past auth, hit a
-    # payload-level 400 instead) - tried first so runs stop guessing auth
-    # as soon as one candidate succeeds.
-    return [
-        ("header:X-API-Key", {"X-API-Key": api_key}, None),
-        ("header:X-Tripadvisor-API-Key", {"X-Tripadvisor-API-Key": api_key}, None),
-        ("query:key", {}, {"key": api_key}),
-        ("header:Authorization-Bearer", {"Authorization": f"Bearer {api_key}"}, None),
-    ]
+def _auth_kwargs(api_key: str) -> dict:
+    """requests() kwargs for the confirmed auth scheme. TRIPADVISOR_AUTH_MODE
+    is an escape hatch (query param instead of header) in case the header
+    scheme ever stops working - not needed under normal operation."""
+    if os.environ.get("TRIPADVISOR_AUTH_MODE", "").strip().lower() == "query":
+        return {"headers": {"Content-Type": "application/json"}, "params": {"key": api_key}}
+    return {"headers": {"Content-Type": "application/json", "X-API-Key": api_key}, "params": None}
+
+
+def _upload_allowlist(base_url: str, auth_kwargs: dict) -> bool:
+    """POST {"allowlist": [SOPRON_GEO_ID], "operation_type": "APPEND"} to
+    /allowlist. APPEND only adds to the existing allowlist - it never
+    removes or replaces entries. Returns whether the call succeeded."""
+    try:
+        resp = requests.post(
+            f"{base_url.rstrip('/')}/allowlist",
+            json={"allowlist": [SOPRON_GEO_ID], "operation_type": "APPEND"},
+            timeout=15,
+            **auth_kwargs,
+        )
+        print(f"POST /allowlist (APPEND [{SOPRON_GEO_ID}]): {resp.status_code} {resp.text[:1000]}")
+        return resp.ok
+    except requests.RequestException as exc:
+        print(f"POST /allowlist failed: {exc}")
+        return False
 
 
 def send_request(base_url: str, api_key: str) -> dict:
-    # Confirmed request shape (repo owner pulled two examples from
-    # Tripadvisor's readme.io reference page): {"query": <natural
-    # language>, "geo": {"name": <place>} (or {"search_area": {lat, lng,
-    # search_radius_meters}}), "limit": <n>, "response_preference":
-    # "quality"}. There's also a "top_level_categories" filter (e.g.
-    # ["Attraction"]) - left out here since the exact enum value for
-    # hotels is unconfirmed and a wrong one risks another 400; the query
-    # text does that filtering instead for now. No date/guests/rooms/sort
-    # fields exist in this schema at all - it's a semantic recommendations
-    # endpoint, not a structured price-search API, which lines up with
-    # pricing never being listed among the Partner API's data types.
     url = f"{base_url.rstrip('/')}/recommendations/search"
     payload = {
         "query": f"best hotels in {LOCATION}",
@@ -157,70 +160,28 @@ def send_request(base_url: str, api_key: str) -> dict:
         "limit": 20,
         "response_preference": "quality",
     }
+    auth_kwargs = _auth_kwargs(api_key)
 
-    requested_mode = os.environ.get("TRIPADVISOR_AUTH_MODE", "").strip()
-    candidates = _auth_candidates(api_key)
-    if requested_mode:
-        candidates = [c for c in candidates if c[0] == requested_mode]
-        if not candidates:
-            sys.exit(
-                f"TRIPADVISOR_AUTH_MODE={requested_mode!r} doesn't match any "
-                f"known scheme: {[c[0] for c in _auth_candidates(api_key)]}"
-            )
+    response = requests.post(url, json=payload, timeout=30, **auth_kwargs)
 
-    attempts = []
-    for name, extra_headers, params in candidates:
-        headers = {"Content-Type": "application/json", **extra_headers}
-        response = requests.post(url, headers=headers, params=params, json=payload, timeout=30)
-        if response.status_code == 401:
-            # Truly unauthenticated - this scheme isn't even being read as
-            # a credential, so it's worth trying the next one.
-            attempts.append(f"{name}: 401 {response.text[:200]!r}")
-            continue
-        if response.status_code == 403:
-            # The key WAS read (contrast with the 401s from other schemes
-            # on the same request) but access was denied - almost
-            # certainly an allowlist/entitlement issue, not a wrong auth
-            # scheme, so trying the remaining schemes would just waste
-            # requests. Probe /allowlist (from the endpoint overview) with
-            # this same working header for a direct diagnosis.
-            print(f"Auth scheme '{name}' was read as a credential but got 403: {response.text[:500]}")
-            _probe_allowlist(base_url, name, extra_headers)
-            sys.exit("Access denied (403) - see the allowlist probe above for what's currently permitted.")
-        print(f"Auth scheme '{name}' got past authentication (status {response.status_code}).")
-        if not response.ok:
-            print(f"Response body: {response.text[:2000]}")
-        response.raise_for_status()
-        body = response.json()
-        print(f"Response JSON keys: {list(body.keys())}")
-        # Full dump so response parsing can be nailed down from this run's
-        # log alone, without yet another manual dispatch round trip.
-        print(f"Full response body:\n{json.dumps(body, indent=2)[:4000]}")
-        return body
+    if response.status_code == 403:
+        # Confirmed via run #5: this means the key IS valid but Sopron
+        # isn't allowlisted yet, not a wrong auth scheme or payload - see
+        # the module docstring. Self-heal once, then retry the search.
+        print(f"Search denied (403), attempting to allowlist Sopron (geo id {SOPRON_GEO_ID}): {response.text[:500]}")
+        if not _upload_allowlist(base_url, auth_kwargs):
+            sys.exit("Allowlist upload failed - see the POST /allowlist response above.")
+        response = requests.post(url, json=payload, timeout=30, **auth_kwargs)
 
-    sys.exit(
-        "All auth schemes were rejected (401) by "
-        + url
-        + ":\n"
-        + "\n".join(attempts)
-        + "\nThe key itself may be inactive/wrong for this endpoint - check the Terra dashboard."
-    )
-
-
-def _probe_allowlist(base_url: str, scheme_name: str, extra_headers: dict) -> None:
-    """Best-effort GET /allowlist diagnostic for a 403 on the main
-    request - per the endpoint overview, this lists which location IDs
-    the key is permitted to query. Never raises; this is purely
-    informational output for the run log."""
-    try:
-        resp = requests.get(
-            f"{base_url.rstrip('/')}/allowlist",
-            headers={"Content-Type": "application/json", **extra_headers},
-            timeout=15,
-        )
-        print(f"GET /allowlist (using {scheme_name}): {resp.status_code} {resp.text[:1000]}")
-    except requests.RequestException as exc:
-        print(f"GET /allowlist probe failed: {exc}")
+    if not response.ok:
+        print(f"Response body: {response.text[:2000]}")
+    response.raise_for_status()
+    body = response.json()
+    print(f"Response JSON keys: {list(body.keys())}")
+    # Full dump so response parsing can be nailed down from this run's log
+    # alone, without yet another manual dispatch round trip.
+    print(f"Full response body:\n{json.dumps(body, indent=2)[:4000]}")
+    return body
 
 
 def fetch_hotels(previous_by_id: dict) -> list:

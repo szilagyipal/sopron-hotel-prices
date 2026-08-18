@@ -26,30 +26,31 @@ variables → Actions → New repository secret) - never commit them to a file:
 |---|---|---|
 | `TRIPADVISOR_API_KEY` | yes | Your Tripadvisor Terra/Partner API key |
 | `TRIPADVISOR_TERRA_BASE_URL` | no | Defaults to `https://terra.tripadvisor.com/api`. Only set this if your account uses a different host. |
-| `TRIPADVISOR_AUTH_MODE` | no | Pin to one auth scheme instead of trying all of them each run - see `refresh.py`'s `_auth_candidates()` for the exact values |
+| `TRIPADVISOR_AUTH_MODE` | no | `header` (default, `X-API-Key: <key>`) or `query` (`?key=<key>`) - escape hatch only, header is confirmed working |
 
 Until `TRIPADVISOR_API_KEY` is set, the scheduled workflow will fail
 without changing `data.json`, so the live widget just keeps showing the
 last good snapshot.
 
-**Status as of the first real run:** `https://terra.tripadvisor.com/api`
-is reachable and `POST /recommendations/search` exists (confirmed by a
-clean `401`, not a connection error), but the `X-Tripadvisor-API-Key`
-header scheme was rejected. `refresh.py` now tries several plausible auth
-schemes per run and logs which one (if any) gets past authentication -
-check the latest run's log for a line like `Auth scheme '...' got past
-authentication`. If all of them 401, the key itself likely needs
-checking on the Terra dashboard (inactive, wrong product/plan, etc.)
-rather than the scheme being wrong.
+**Confirmed working:** base URL, the `X-API-Key` header, and the
+`POST /recommendations/search` request shape (`{"query": ..., "geo":
+{"name": ...}, "limit": ..., "response_preference": "quality"}`). The
+first few real runs hit a `403 Forbidden` ("API Key does not have access
+to endpoint") because Sopron's Tripadvisor geo ID (`274909`) wasn't on
+this key's allowlist (`GET /allowlist` came back empty) - `refresh.py`
+now self-heals that automatically by `POST`ing `{"allowlist": [274909],
+"operation_type": "APPEND"}` (additive only) and retrying the search
+once, so this should no longer need manual intervention.
 
-**Known gap:** Tripadvisor's published Partner API endpoint overview
-(`/recommendations/search`, `/locations/{id}`, `/locations/{id}/reviews`,
-`/locations/{id}/photos`, `/geos/{id}`, plus feed/allowlist endpoints)
-doesn't list pricing among its data types - live per-night pricing is
-usually a separate sponsored-placement feed. Until that's confirmed one
-way or the other, `refresh.py` updates rank/rating/review data normally
-each run but keeps a hotel's last known price if the response doesn't
-include one, rather than zeroing it out.
+**Still open:** the exact shape of a successful `/recommendations/search`
+response for hotels is unconfirmed - `refresh.py` logs the full response
+body on success, so check the latest run's log and adjust `parse_hotel()`
+if the field names it reads (`hotelId`/`location_id`, `hotelName`/`name`,
+`reviewSummary`, `priceInfo`, etc.) don't match what actually comes back.
+Pricing in particular was never listed among the Partner API's documented
+data types (Location/Reviews/Photos/Geo/Recommendations only), so it may
+not be present at all - `parse_hotel()` keeps each hotel's last known
+price rather than zeroing it out if a response has none.
 
 You can trigger a refresh immediately (rather than waiting for the daily
 schedule) from the Actions tab → "Refresh Sopron hotel prices" → "Run
